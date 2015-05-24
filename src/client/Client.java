@@ -183,9 +183,10 @@ public class Client {
      */
     private void init () throws RemoteException, JMSException {
         setFact(serv.getFactory());
-        setCon(getFact().createTopicConnection(name, password));
+        setCon(getFact().createTopicConnection());
+        getCon().setClientID(name);
         setSession(getCon().createTopicSession(false, Session.AUTO_ACKNOWLEDGE));
-        getCon().start();
+        getCon().start();        
         // On créé le topic de l'utilisateur (sa page perso).
         getSession().createTopic(name);
         // On conserve le nom du topic.
@@ -241,7 +242,7 @@ public class Client {
             }
             ts.clear();
             for (String s : utilisateur.getAbo()) {
-                ts.add(getSession().createSubscriber(getSession().createTopic(s)));
+                ts.add(getSession().createDurableSubscriber(getSession().createTopic(s),s));
             }
         } catch (JMSException | RemoteException e) {
             e.printStackTrace();
