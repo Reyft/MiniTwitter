@@ -13,28 +13,40 @@ import java.util.List;
 import java.util.Scanner;
 
 public class Client {
-    private UserInterface me = null;
+    // L'utilisateur.
+    private UserInterface utilisateur = null;
+
     private TopicConnectionFactory fact = null;
     private TopicConnection con = null;
     private TopicSession session = null;
     private TopicPublisher tp = null;
     private List<TopicSubscriber> ts = new ArrayList<TopicSubscriber>();
     private Topic t = null;
-    private static Scanner scan = new Scanner(System.in);
+    private Scanner scan;
 
+    // Le serveur Twitter.
+    private Serveur serv;
+
+    // Le nom et mdp du client.
+    private String name, password;
+
+    // Méthode d'initialisation du client.
     public Client () {
+        scan = new Scanner(System.in);
+        serv = null;
+        name = password = "";
     }
 
     public void setFact (TopicConnectionFactory factory) {
         fact = factory;
     }
 
-    public UserInterface getMe () {
-        return me;
+    public UserInterface getUtilisateur () {
+        return utilisateur;
     }
 
-    public void setMe (UserInterface me) {
-        this.me = me;
+    public void setUtilisateur (UserInterface utilisateur) {
+        this.utilisateur = utilisateur;
     }
 
     public TopicConnection getCon () {
@@ -73,63 +85,107 @@ public class Client {
         return fact;
     }
 
-    public static void main (String[] args) {
-        Client c = new Client();
-        c.run();
+    /**
+     * Lancement de tout ce que doit faire un client.
+     */
+    private void run () throws RemoteException, NotBoundException, MalformedURLException, JMSException {
+        // Recherche du serveur.
+        serv = (Serveur) Naming.lookup("rmi://localhost/MiniTwitter");
+
+        // Choix du nom d'utilisateur et du mdp.
+        inscription();
+
+        // Initialisation des variables.
+        init();
+
+        menuPrincipal();
+
+        close();
+        System.out.println("Au revoir");
     }
 
-    private void run () {
-        Serveur serv;
-        String name = null;
-        String password = null;
-        try {
-            serv = (Serveur) Naming.lookup("rmi://localhost/MiniTwitter");
-            System.out.println("Name + password ?");
-            name = nextString();
-            password = nextString();
-            setMe(serv.Connection(name, password));
-            if (getMe() == null) {
-                System.out.println("Pseudo deja pris");
+    /**
+     * On monte les choix du menu principal.
+     *
+     * @throws RemoteException
+     * @throws JMSException
+     */
+    private void menuPrincipal () throws JMSException, RemoteException {
+        String choix;
+        do {
+            System.out.println("1 : Envoyer message\n2 : Voir mes messages\n3 : S'abonner\n4 : Quitter");
+            choix = scan.nextLine();
+            switch (choix) {
+                case "1":
+                    publishMessage();
+                    break;
+                case "2":
+                    afficheMessage();
+                    break;
+                case "3":
+                    abonnement();
+                    break;
             }
-            setFact(serv.getFactory());
-            setCon(getFact().createTopicConnection());
-            setSession(getCon().createTopicSession(false, Session.AUTO_ACKNOWLEDGE));
-            getCon().start();
-            setT(getSession().createTopic(name));
-            miseAJourAbo();
-            setTp(getSession().createPublisher(getT()));
-            int choix = 0;
-            while (choix != 4) {
-                System.out.println("1 : Envoyer message\n2 : Voir mes messages\n3 : S'abonner\n4 : Quitter");
-                choix = nextInt();
-                nextString(); // On vide la ligne
-                switch (choix) {
-                    case 1:
-                        System.out.println("votre message ?");
-                        String mes = nextString();
-                        TextMessage m = getSession().createTextMessage(mes);
-                        getTp().publish(m);
-                        break;
-                    case 2:
-                        afficheMessage();
-                        break;
-                    case 3:
-                        System.out.println("Choississez parmis :");
-                        System.out.println(serv.affichage());
-                        String res = nextString();
-                        serv.abonnement(getMe(), res);
-                        miseAJourAbo();
-                        break;
-                    default:
-                        break;
-                }
-            }
-            close();
-            System.out.println("Au revoir");
-        } catch (MalformedURLException | RemoteException | NotBoundException
-                | JMSException e) {
-            e.printStackTrace();
-        }
+        } while (!choix.equals("4"));
+    }
+
+    /**
+     * Permet de s'abonner.
+     *
+     * @throws RemoteException
+     */
+    private void abonnement () throws RemoteException {
+        System.out.println("Choississez parmis :");
+        System.out.println(serv.affichage());
+        String res = scan.nextLine().trim();
+        serv.abonnement(getUtilisateur(), res);
+        miseAJourAbo();
+    }
+
+    /**
+     * Publier un message.
+     *
+     * @throws JMSException
+     */
+    private void publishMessage () throws JMSException {
+        System.out.println("votre message ?");
+        String mes = scan.nextLine();
+        TextMessage m = getSession().createTextMessage(mes);
+        getTp().publish(m);
+    }
+
+    /**
+     * Initialise plein de variables.
+     *
+     * @throws RemoteException
+     * @throws JMSException
+     */
+    private void init () throws RemoteException, JMSException {
+        setFact(serv.getFactory());
+        setCon(getFact().createTopicConnection());
+        setSession(getCon().createTopicSession(false, Session.AUTO_ACKNOWLEDGE));
+        getCon().start();
+        setT(getSession().createTopic(name));
+        miseAJourAbo();
+        setTp(getSession().createPublisher(getT()));
+    }
+
+    /**
+     * Permet au client de choisir un nom d'utilisateur et un mdp.
+     *
+     * @throws RemoteException
+     */
+    private void inscription () throws RemoteException {
+        do {
+            System.out.println("######### Inscription #########");
+            System.out.println("Veuillez choisir un nom d'utilisateur :");
+            name = scan.nextLine().trim();
+            System.out.println("Veuillez choisir un mot de passe :");
+            password = scan.nextLine().trim();
+
+            // Création de l'utilisateur.
+            setUtilisateur(serv.Connection(name, password));
+        } while (getUtilisateur() == null);
     }
 
     private void afficheMessage () {
@@ -152,13 +208,16 @@ public class Client {
         }
     }
 
+    /**
+     * On met à jour les abonnements.
+     */
     private void miseAJourAbo () {
         try {
             for (TopicSubscriber s : ts) {
                 s.close();
             }
             ts.clear();
-            for (String s : me.getAbo()) {
+            for (String s : utilisateur.getAbo()) {
                 ts.add(getSession().createSubscriber(getSession().createTopic(s)));
             }
         } catch (JMSException | RemoteException e) {
@@ -167,6 +226,10 @@ public class Client {
 
     }
 
+    /**
+     * Fermeture propre des du topicPublisher, des topics Subscribers, de la session,
+     * de la topic Connection, et du scanner.
+     */
     private void close () {
         try {
             tp.close();
@@ -181,15 +244,16 @@ public class Client {
         }
     }
 
-    private static String nextString () {
-        String res;
-        res = scan.nextLine();
-        return res;
-    }
-
-    private static int nextInt () {
-        int res;
-        res = scan.nextInt();
-        return res;
+    /**
+     * Lancement du client.
+     *
+     * @param args
+     */
+    public static void main (String[] args) {
+        try {
+            new Client().run();
+        } catch (RemoteException | NotBoundException | MalformedURLException | JMSException e) {
+            e.printStackTrace();
+        }
     }
 }
