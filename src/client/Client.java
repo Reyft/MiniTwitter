@@ -148,7 +148,8 @@ public class Client {
         System.out.println("votre message ?");
         String mes = scan.nextLine().trim();
         TextMessage m = getSession().createTextMessage(mes);
-        topicPublisher.publish(m);
+        //topicPublisher.setDeliveryMode(DeliveryMode.PERSISTENT);
+        topicPublisher.publish(m, DeliveryMode.PERSISTENT, 4, 0);
         topicPublisher.close();
     }
 
