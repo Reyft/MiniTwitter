@@ -182,7 +182,7 @@ public class Client {
      */
     private void init () throws RemoteException, JMSException {
         setFact(serv.getFactory());
-        setCon(getFact().createTopicConnection());
+        setCon(getFact().createTopicConnection(name, password));
         setSession(getCon().createTopicSession(false, Session.AUTO_ACKNOWLEDGE));
         getCon().start();
         // On créé le topic de l'utilisateur (sa page perso).
