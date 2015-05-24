@@ -11,6 +11,7 @@ import java.rmi.RemoteException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Set;
 
 public class Client {
     // L'utilisateur.
@@ -18,10 +19,11 @@ public class Client {
 
     private TopicConnectionFactory fact = null;
     private TopicConnection con = null;
+
+    // Notre session.
     private TopicSession session = null;
-    private TopicPublisher tp = null;
+
     private List<TopicSubscriber> ts = new ArrayList<TopicSubscriber>();
-    private Topic t = null;
     private Scanner scan;
 
     // Le serveur Twitter.
@@ -65,22 +67,6 @@ public class Client {
         this.session = session;
     }
 
-    public TopicPublisher getTp () {
-        return tp;
-    }
-
-    public void setTp (TopicPublisher tp) {
-        this.tp = tp;
-    }
-
-    public Topic getT () {
-        return t;
-    }
-
-    public void setT (Topic t) {
-        this.t = t;
-    }
-
     public TopicConnectionFactory getFact () {
         return fact;
     }
@@ -113,8 +99,8 @@ public class Client {
     private void menuPrincipal () throws JMSException, RemoteException {
         String choix;
         do {
-            System.out.println("1 : Envoyer message\n2 : Voir mes messages\n3 : S'abonner\n4 : Quitter");
-            choix = scan.nextLine();
+            System.out.println("0 : Quitter\n1 : Envoyer message\n2 : Voir mes messages\n3 : S'abonner\n4 : Créer un topic");
+            choix = scan.nextLine().trim();
             switch (choix) {
                 case "1":
                     publishMessage();
@@ -125,12 +111,22 @@ public class Client {
                 case "3":
                     abonnement();
                     break;
+                case "4":
+                    creerTopic();
+                    break;
             }
-        } while (!choix.equals("4"));
+        } while (!choix.equals("0"));
+    }
+
+    private void creerTopic () throws JMSException, RemoteException {
+        System.out.println("Veuillez choisir un nom de topic : ");
+        String nom = scan.nextLine().trim();
+        getSession().createTopic(nom);
+        serv.conservTopicName(nom);
     }
 
     /**
-     * Permet de s'abonner.
+     * Permet de s'abonner. On peut s'abboner uniquement à un utilisateur.
      *
      * @throws RemoteException
      */
@@ -147,11 +143,35 @@ public class Client {
      *
      * @throws JMSException
      */
-    private void publishMessage () throws JMSException {
+    private void publishMessage () throws JMSException, RemoteException {
+        TopicPublisher topicPublisher = choixTopicPublish();
         System.out.println("votre message ?");
-        String mes = scan.nextLine();
+        String mes = scan.nextLine().trim();
         TextMessage m = getSession().createTextMessage(mes);
-        getTp().publish(m);
+        topicPublisher.publish(m);
+        topicPublisher.close();
+    }
+
+    /**
+     * On choisi sur quel topic on publie.
+     * @return Le topic sur lequel on choisit de publier.
+     * @throws JMSException
+     * @throws RemoteException
+     */
+    private TopicPublisher choixTopicPublish () throws JMSException, RemoteException {
+        System.out.println("Veuillez choisir un topic sur lequel publié");
+        Set<String> listTopicName = serv.getListTopicName();
+        for (String nom : listTopicName) {
+            System.out.println(" - " + nom);
+        }
+        String nomChoisi = scan.nextLine().trim();
+
+        // Vérification si le topic existe (pour éviter de le créer sinon).
+        if (!listTopicName.contains(nomChoisi)) {
+            System.out.println("Veuillez choisir un topic existant");
+            choixTopicPublish();
+        }
+        return getSession().createPublisher(getSession().createTopic(nomChoisi));
     }
 
     /**
@@ -165,9 +185,11 @@ public class Client {
         setCon(getFact().createTopicConnection());
         setSession(getCon().createTopicSession(false, Session.AUTO_ACKNOWLEDGE));
         getCon().start();
-        setT(getSession().createTopic(name));
+        // On créé le topic de l'utilisateur (sa page perso).
+        getSession().createTopic(name);
+        // On conserve le nom du topic.
+        serv.conservTopicName(name);
         miseAJourAbo();
-        setTp(getSession().createPublisher(getT()));
     }
 
     /**
@@ -232,7 +254,6 @@ public class Client {
      */
     private void close () {
         try {
-            tp.close();
             for (TopicSubscriber s : ts) {
                 s.close();
             }

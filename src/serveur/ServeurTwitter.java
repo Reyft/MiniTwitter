@@ -8,17 +8,23 @@ import java.rmi.Naming;
 import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @SuppressWarnings("serial")
 public class ServeurTwitter extends UnicastRemoteObject implements Serveur {
     private TopicConnectionFactory factory;
     private List<User> users;
 
+    // La liste des noms de topic.
+    private Set<String> listTopicName;
+
     public ServeurTwitter () throws RemoteException {
         super();
         factory = null;
         users = new ArrayList<User>();
+        listTopicName = new HashSet<>();
     }
 
     @Override
@@ -53,15 +59,15 @@ public class ServeurTwitter extends UnicastRemoteObject implements Serveur {
         boolean rep = false;
         boolean rep2 = true;
         try {
-            for (User us : users) {
-                if (us.getName().equals(name)) {
+            for (String topicName : listTopicName) {
+                if (topicName.equals(name)) {
                     rep = true;
                 }
             }
             if (rep) {
                 for (String n : u.getAbo()) {
                     if (n.equals(name)) {
-                        System.out.println("Vous êtes dejà abboné a cette personne");
+                        System.out.println("Vous êtes dejà abboné a cette personne ou topic");
                         rep2 = false;
                     }
                 }
@@ -80,10 +86,10 @@ public class ServeurTwitter extends UnicastRemoteObject implements Serveur {
     @Override
     public String affichage () {
         String res = "";
-        for (User u : users) {
-            res += u.getName() + ", ";
+        for (String nomTopic : listTopicName) {
+            res += nomTopic + ", ";
         }
-        return res;
+        return res.trim();
     }
 
     @Override
@@ -97,6 +103,27 @@ public class ServeurTwitter extends UnicastRemoteObject implements Serveur {
             res += "\n";
         }
         return res;
+    }
+
+    /**
+     * Permet d'ajouter le nom d'un topic à la liste des topics existants.
+     *
+     * @param name Le nom du topic
+     * @throws RemoteException
+     */
+    @Override
+    public void conservTopicName (String name) throws RemoteException {
+        listTopicName.add(name);
+    }
+
+    /**
+     * Permet de récupérer la liste des noms des topics.
+     *
+     * @return La liste des noms des topics.
+     */
+    @Override
+    public Set<String> getListTopicName () {
+        return listTopicName;
     }
 
     @Override
